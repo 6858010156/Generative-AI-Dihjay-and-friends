@@ -1,0 +1,13 @@
+Machine Learning for Stock Prediction: Methods and Limitations
+
+Machine learning can analyze financial data to estimate patterns or predict quantities such as next-period returns, price direction, or volatility. Common approaches include tree-based models, neural networks, and reinforcement learning. Input variables might include historical prices, trading volume, company information, and economic indicators.
+
+A responsible experiment splits data chronologically into training and testing periods, prevents future information from leaking into model inputs, and compares predictions with simple baselines. Prediction accuracy alone is insufficient to judge an investment strategy. A simulation should also consider drawdowns, trading fees, risk, and whether the strategy could be executed under realistic conditions.
+
+AI outputs may be inaccurate, outdated, or fabricated. Market prices are affected by unexpected events, and no AI system can guarantee future returns. Users should verify claims and avoid treating chatbot responses as personalized investment advice.
+
+Sources:
+UK Financial Conduct Authority (2026), Using AI for investment research. https://www.fca.org.uk/investsmart/using-ai-investment-research
+US Investor.gov (2024), Artificial Intelligence (AI) and Investment Fraud: Investor Alert. https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-alerts/artificial-intelligence-fraud
+
+Educational use only; not financial advice.

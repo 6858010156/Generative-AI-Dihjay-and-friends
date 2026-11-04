@@ -1,0 +1,13 @@
+AI Trading Simulator: Educational Overview
+
+An AI investment simulator is a software environment for testing investment strategies without risking real money. Users can simulate buying and selling assets with virtual capital, observe portfolio changes, and compare strategies. Backtesting applies a strategy to historical data, while paper trading tests decisions without placing real trades.
+
+A typical simulator includes historical price data, portfolio balances, trade execution rules, transaction costs, and performance metrics. Some systems add machine-learning forecasts or trading agents. Models such as random forests and LSTMs can be used to forecast market indicators, but a forecast is not a guaranteed profitable trade.
+
+Important measures include total return, volatility, maximum drawdown, Sharpe ratio, and portfolio turnover. A robust evaluation avoids look-ahead bias, separates training and testing periods, and accounts for trading costs and market changes. Simulated results can differ substantially from live outcomes.
+
+Sources:
+Lee et al. (2025), Design and Implementation of an AI-Driven Algorithmic Trading Simulation Platform for Strategy Backtesting and Forecasting. https://doi.org/10.56977/jicce.2025.23.4.327
+Mascioli et al. (2024), A Financial Market Simulation Environment for Trading Agents Using Deep Reinforcement Learning. https://strategicreasoning.org/a-financial-market-simulation-environment-for-trading-agents-using-deep-reinforcement-learning/
+
+Educational use only; not financial advice.

@@ -1,0 +1,13 @@
+AI Portfolio Management: Educational Overview
+
+Portfolio management involves choosing and monitoring a combination of investments. Common goals include balancing expected return, risk, liquidity, and diversification. AI-based systems may assist by analyzing historical prices, identifying patterns, classifying risk, or suggesting portfolio allocations.
+
+An investment simulator can compare a concentrated portfolio with a diversified one. Diversification can reduce exposure to a single company or asset, although it cannot eliminate market risk. Risk-adjusted performance metrics, such as the Sharpe ratio, compare excess return with volatility. Maximum drawdown measures the largest observed decline from a portfolio peak to a later trough.
+
+Machine-learning systems need reliable input data and realistic evaluation. Market conditions change, and a model that performs well on past data may not generalize to the future. Human oversight, transparency, and attention to privacy are important when AI is used in financial services.
+
+Sources:
+Lee et al., MAPS: Multi-Agent reinforcement learning-based Portfolio management System (IJCAI 2020). https://ijcai.org/proceedings/2020/623
+European Securities and Markets Authority (2024), Guidance on AI in investment services. https://www.esma.europa.eu/press-news/esma-news/esma-provides-guidance-firms-using-artificial-intelligence-investment-services
+
+Educational use only; not financial advice.
