@@ -1,47 +1,29 @@
+'use strict';
+const $ = id => document.getElementById(id);
 const history = [];
-const chat = document.getElementById('chat');
-const status = document.getElementById('status');
-function addMessage(role, content) {
-  const p = document.createElement('div'); p.className = 'message ' + role;
-  // Linkify without inserting untrusted HTML.
-  const regex = /https?:\/\/[^\s<>"']+/g;
-  let last = 0;
-  for (const match of content.matchAll(regex)) {
-    p.append(document.createTextNode(content.slice(last, match.index)));
-    const a = document.createElement('a'); a.href = match[0]; a.textContent = match[0];
-    a.target = '_blank'; a.rel = 'noopener noreferrer'; p.append(a);
-    last = match.index + match[0].length;
-  }
-  p.append(document.createTextNode(content.slice(last)));
-  chat.append(p); chat.scrollTop = chat.scrollHeight;
+let docs = [], busy = false;
+const titles = ['AI Portfolio Management','AI Trading Simulation','ML Stock Prediction & Risks'];
+const descriptions = ['How AI can support allocation, diversification, and risk assessment.','Backtesting, paper trading, and evaluating strategies realistically.','Prediction methods, evaluation pitfalls, and why returns are never guaranteed.'];
+function openDocument(id) { const doc = docs.find(d => d.id === id); if (!doc) return; $('documentTitle').textContent = `[${id}] ${titles[id-1]}`; $('documentText').textContent = doc.text; $('documentDialog').showModal(); }
+$('closeDocument').onclick = () => $('documentDialog').close();
+function addMessage(role, content, data) {
+  $('chat').querySelector('.welcome')?.remove();
+  const box = document.createElement('div'); box.className = 'message ' + role;
+  const label = document.createElement('span'); label.className = 'message-label'; label.textContent = role === 'user' ? 'You' : data?.mode === 'excerpts' ? 'Document excerpts · AI unavailable' : 'AI answer · verify against sources';
+  box.append(label,document.createTextNode(content));
+  if (data?.sources?.length) { const links = document.createElement('div'); links.className = 'source-links'; for (const id of data.sources) { const btn = document.createElement('button'); btn.textContent = `[${id}] ${titles[id-1]}`; btn.onclick = () => openDocument(id); links.append(btn); } box.append(links); }
+  $('chat').append(box); $('chat').scrollTop = $('chat').scrollHeight;
 }
-document.getElementById('chatForm').addEventListener('submit', async e => {
-  e.preventDefault(); const input = document.getElementById('question');
-  const content = input.value.trim(); if (!content) return;
-  document.querySelector('.hint')?.remove(); input.value = ''; status.textContent = 'Gemma is thinking...';
-  const btn = document.getElementById('send'); btn.disabled = true;
-  history.push({role:'user',content}); addMessage('user',content);
-  try {
-    const r = await fetch('/api/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history})});
-    const data = await r.json(); if (!r.ok) throw new Error(data.error || 'Request failed');
-    history.push({role:'assistant',content:data.answer}); addMessage('assistant',data.answer); status.textContent = '';
-  } catch(err) { status.textContent = err.message; } finally { btn.disabled = false; }
+async function health() { try { const r = await fetch('/api/health'); if (!r.ok) throw Error(); const d = await r.json(); $('connection').textContent = d.ready ? '● Local AI ready' : '● Document mode · AI offline'; $('connection').classList.toggle('ready',d.ready); } catch { $('connection').textContent = 'Server unavailable'; } }
+$('chatForm').addEventListener('submit',async e => { e.preventDefault(); if (busy) return; const question = $('question').value.trim(); if (!question) return; busy = true; $('send').disabled = $('clear').disabled = true; document.querySelectorAll('.suggestion').forEach(b => b.disabled = true); $('question').value = ''; addMessage('user',question); $('status').textContent = 'Reading your documents and preparing an answer…';
+  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(),195000);
+  try { const messages = [...history.slice(-10),{role:'user',content:question}]; const r = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages}),signal:controller.signal}); const d = await r.json(); if (!r.ok) throw Error(d.error || 'Unable to answer.'); addMessage('assistant',d.answer,d); if (d.mode === 'ai') { history.push({role:'user',content:question},{role:'assistant',content:d.answer}); } $('status').textContent = d.mode === 'ai' ? 'All three documents were supplied to the model. Check its citations.' : 'Showing source passages. Start Ollama to enable AI answers.'; }
+  catch(err) { $('status').textContent = err.name === 'AbortError' ? 'The model took too long. Please try again.' : err.message; $('question').value = question; }
+  finally { clearTimeout(timer); busy = false; $('send').disabled = $('clear').disabled = false; document.querySelectorAll('.suggestion').forEach(b => b.disabled = false); health(); }
 });
-async function refreshFiles() {
-  const list = document.getElementById('files'); list.replaceChildren();
-  const r = await fetch('/api/files'); const data = await r.json();
-  for (const name of data.files) {
-    const li = document.createElement('li'); li.append(document.createTextNode(name));
-    const btn = document.createElement('button'); btn.textContent = 'Delete';
-    btn.onclick = async () => { const r = await fetch('/api/files/' + encodeURIComponent(name), {method:'DELETE'}); if (r.ok) refreshFiles(); };
-    li.append(btn); list.append(li);
-  }
-}
-document.getElementById('fileForm').addEventListener('submit', async e => {
-  e.preventDefault(); const file = document.getElementById('file').files[0]; if (!file) return;
-  const form = new FormData(); form.append('file',file);
-  const r = await fetch('/api/files',{method:'POST',body:form}); const data = await r.json();
-  document.getElementById('fileStatus').textContent = r.ok ? 'Uploaded: ' + data.filename : data.error;
-  if(r.ok) { e.target.reset(); refreshFiles(); }
-});
-refreshFiles().catch(() => { document.getElementById('fileStatus').textContent = 'Could not load files.'; });
+$('question').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('chatForm').requestSubmit();}});
+document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{$('question').value=b.dataset.question;$('chatForm').requestSubmit();});
+$('clear').onclick=()=>{if(busy)return;history.length=0;$('chat').replaceChildren();$('status').textContent='New conversation started.';$('question').focus();};
+fetch('/api/documents').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{docs=data.documents;$('documents').replaceChildren();docs.forEach(d=>{const card=document.createElement('article');card.className='doc-card';const icon=document.createElement('span');icon.className='doc-icon';icon.textContent='≡';const label=document.createElement('div');label.className='eyebrow';label.textContent=`SOURCE 0${d.id}`;const title=document.createElement('h3');title.textContent=titles[d.id-1];const desc=document.createElement('p');desc.textContent=descriptions[d.id-1];const btn=document.createElement('button');btn.textContent='Read source document ↗';btn.onclick=()=>openDocument(d.id);card.append(icon,label,title,desc,btn);$('documents').append(card);});}).catch(()=>{$('documents').textContent='Source documents could not be loaded. Restart the local server and reload.';});
+function simulate(){const capital=Number($('capital').value);const w=Number($('allocation').value)/100;const scenarios={growth:[.12,.03],decline:[-.20,.02],mixed:[.02,-.03]};const [stocks,bonds]=scenarios[$('scenario').value];$('allocationValue').textContent=`${Math.round(w*100)}%`;$('stockLabel').textContent=`${Math.round(w*100)}%`;$('bondLabel').textContent=`${Math.round((1-w)*100)}%`;$('stockBar').style.width=`${w*100}%`;if(!Number.isFinite(capital)||capital<100||capital>1000000){$('endValue').textContent='—';$('returnValue').textContent='Enter capital between $100 and $1,000,000.';$('simExplanation').textContent='';return;}const rate=w*stocks+(1-w)*bonds;const profit=capital*rate;const money=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});$('endValue').textContent=money(capital+profit);$('returnValue').textContent=`${profit>=0?'+':''}${money(profit)} (${rate>=0?'+':''}${(rate*100).toFixed(1)}%)`;$('returnValue').classList.toggle('negative',profit<0);$('simExplanation').textContent=`Weighted return: ${Math.round(w*100)}% × ${(stocks*100).toFixed(0)}% + ${Math.round((1-w)*100)}% × ${(bonds*100).toFixed(0)}% = ${(rate*100).toFixed(1)}%. Change the allocation or scenario to compare outcomes.`;}
+['capital','allocation','scenario'].forEach(id=>$(id).addEventListener('input',simulate));simulate();health();
