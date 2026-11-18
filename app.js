@@ -25,5 +25,75 @@ $('question').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e
 document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{$('question').value=b.dataset.question;$('chatForm').requestSubmit();});
 $('clear').onclick=()=>{if(busy)return;history.length=0;$('chat').replaceChildren();$('status').textContent='New conversation started.';$('question').focus();};
 fetch('/api/documents').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{docs=data.documents;$('documents').replaceChildren();docs.forEach(d=>{const card=document.createElement('article');card.className='doc-card';const icon=document.createElement('span');icon.className='doc-icon';icon.textContent='≡';const label=document.createElement('div');label.className='eyebrow';label.textContent=`SOURCE 0${d.id}`;const title=document.createElement('h3');title.textContent=titles[d.id-1];const desc=document.createElement('p');desc.textContent=descriptions[d.id-1];const btn=document.createElement('button');btn.textContent='Read source document ↗';btn.onclick=()=>openDocument(d.id);card.append(icon,label,title,desc,btn);$('documents').append(card);});}).catch(()=>{$('documents').textContent='Source documents could not be loaded. Restart the local server and reload.';});
-function simulate(){const capital=Number($('capital').value);const w=Number($('allocation').value)/100;const scenarios={growth:[.12,.03],decline:[-.20,.02],mixed:[.02,-.03]};const [stocks,bonds]=scenarios[$('scenario').value];$('allocationValue').textContent=`${Math.round(w*100)}%`;$('stockLabel').textContent=`${Math.round(w*100)}%`;$('bondLabel').textContent=`${Math.round((1-w)*100)}%`;$('stockBar').style.width=`${w*100}%`;if(!Number.isFinite(capital)||capital<100||capital>1000000){$('endValue').textContent='—';$('returnValue').textContent='Enter capital between $100 and $1,000,000.';$('simExplanation').textContent='';return;}const rate=w*stocks+(1-w)*bonds;const profit=capital*rate;const money=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});$('endValue').textContent=money(capital+profit);$('returnValue').textContent=`${profit>=0?'+':''}${money(profit)} (${rate>=0?'+':''}${(rate*100).toFixed(1)}%)`;$('returnValue').classList.toggle('negative',profit<0);$('simExplanation').textContent=`Weighted return: ${Math.round(w*100)}% × ${(stocks*100).toFixed(0)}% + ${Math.round((1-w)*100)}% × ${(bonds*100).toFixed(0)}% = ${(rate*100).toFixed(1)}%. Change the allocation or scenario to compare outcomes.`;}
-['capital','allocation','scenario'].forEach(id=>$(id).addEventListener('input',simulate));simulate();health();
+const money = n => n.toLocaleString('en-US', {style:'currency', currency:'USD', maximumFractionDigits:2});
+const percent = n => `${n >= 0 ? '+' : ''}${Number(n.toFixed(2))}%`;
+const scenarios = {growth:[12,3], decline:[-20,2], mixed:[2,-3]};
+function calculatePortfolio(capital, allocation, stockReturn, bondReturn) {
+  const stockCapital = capital * allocation / 100;
+  const bondCapital = capital - stockCapital;
+  const stockProfit = stockCapital * stockReturn / 100;
+  const bondProfit = bondCapital * bondReturn / 100;
+  const profit = stockProfit + bondProfit;
+  return {stockCapital, bondCapital, stockProfit, bondProfit, profit,
+    ending: capital + profit, rate: profit / capital * 100};
+}
+function simulate() {
+  const capital = Number($('capital').value), allocation = Number($('allocation').value);
+  const stocks = Number($('stockReturn').value), bonds = Number($('bondReturn').value);
+  $('allocationValue').textContent = $('stockLabel').textContent = `${allocation}%`;
+  $('bondLabel').textContent = `${100-allocation}%`;
+  $('stockBar').style.width = `${allocation}%`;
+  const valid = ['capital','stockReturn','bondReturn'].every(id => $(id).value.trim() !== '' && Number.isFinite(Number($(id).value)))
+    && capital >= 100 && capital <= 1000000 && stocks >= -100 && stocks <= 1000 && bonds >= -100 && bonds <= 1000;
+  $('comparisonChart').replaceChildren(); $('simBreakdown').replaceChildren();
+  if (!valid) {
+    $('endValue').textContent = '—'; $('returnValue').textContent = 'Check your scenario inputs.';
+    $('simExplanation').textContent = 'Enter capital from $100 to $1,000,000 and both returns from −100% to +1,000%.';
+    $('comparisonChart').setAttribute('aria-label', 'Comparison unavailable: check scenario inputs.');
+    $('comparisonNote').textContent = ''; return;
+  }
+  const result = calculatePortfolio(capital, allocation, stocks, bonds);
+  $('endValue').textContent = money(result.ending);
+  $('returnValue').textContent = `${result.profit >= 0 ? '+' : ''}${money(result.profit)} (${percent(result.rate)})`;
+  $('returnValue').classList.toggle('negative', result.profit < 0);
+  $('simExplanation').textContent = `Weighted return: ${allocation}% × (${percent(stocks)}) + ${100-allocation}% × (${percent(bonds)}) = ${percent(result.rate)}.`;
+  for (const [name, amount, profit] of [['Stocks', result.stockCapital, result.stockProfit], ['Bonds', result.bondCapital, result.bondProfit]]) {
+    const row = document.createElement('div');
+    const label = document.createElement('span'); label.textContent = `${name} · ${money(amount)} invested`;
+    const value = document.createElement('strong'); value.textContent = `${profit >= 0 ? '+' : ''}${money(profit)}`;
+    value.classList.toggle('negative', profit < 0); row.append(label,value); $('simBreakdown').append(row);
+  }
+  const comparisons = [
+    ['Your mix', result.ending, result.rate],
+    ['100% stocks', capital * (1 + stocks / 100), stocks],
+    ['100% bonds', capital * (1 + bonds / 100), bonds]
+  ];
+  const scale = Math.max(capital, ...comparisons.map(item => item[1]));
+  const summary = [];
+  for (const [name, ending, rate] of comparisons) {
+    const row = document.createElement('div'); row.className = 'comparison-row';
+    const heading = document.createElement('div'); heading.className = 'comparison-label';
+    const label = document.createElement('strong'); label.textContent = name;
+    const value = document.createElement('span'); value.textContent = `${money(ending)} (${percent(rate)})`;
+    heading.append(label,value);
+    const track = document.createElement('div'); track.className = 'comparison-track';
+    const bar = document.createElement('div'); bar.className = 'comparison-fill'; bar.style.width = `${Math.max(0,ending) / scale * 100}%`;
+    const marker = document.createElement('span'); marker.className = 'capital-marker'; marker.style.left = `${capital / scale * 100}%`;
+    track.append(bar,marker); row.append(heading,track); $('comparisonChart').append(row);
+    summary.push(`${name}: ${money(ending)}, return ${percent(rate)}`);
+  }
+  $('comparisonChart').setAttribute('aria-label', summary.join('. '));
+  $('comparisonNote').textContent = `Starting amount marker: ${money(capital)}. These comparisons illustrate your assumptions, not which investment will perform best in real markets.`;
+}
+['capital','allocation'].forEach(id => $(id).addEventListener('input', simulate));
+['stockReturn','bondReturn'].forEach(id => $(id).addEventListener('input', () => { $('scenario').value = 'custom'; simulate(); }));
+$('scenario').addEventListener('change', () => {
+  const preset = scenarios[$('scenario').value];
+  if (preset) { $('stockReturn').value = preset[0]; $('bondReturn').value = preset[1]; }
+  simulate();
+});
+$('resetSimulation').onclick = () => {
+  $('capital').value = 10000; $('allocation').value = 60; $('scenario').value = 'growth';
+  $('stockReturn').value = 12; $('bondReturn').value = 3; simulate();
+};
+simulate(); health();
